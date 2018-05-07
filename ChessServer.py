@@ -13,40 +13,88 @@ class BaseHandler(tornado.web.RequestHandler):
 
 
 class ChessHandler(BaseHandler):
+
+    def get_post(self):
+        info_ = ""
+        user=hall.get_user_with_uid(self.current_user)
+        room_info = hall.get_room_info_with_user(self.current_user)
+        chess_board = None
+        last_move=None
+        room_status = 0
+        import ChessHelper
+        if room_info['status'] >0:
+            # ChessHelper.playRandomGame(room_info['room'].board)\
+            room=room_info['room']
+            chess_board=room.board
+            last_move=room.get_last_move()
+            # chess_board = ChessHelper.printBoard2Str(room_info['room'].board)
+
+
+        # print room_info
+        self.render("page/chessboard.html", username=self.current_user, roominfo=room_info, info=info_,
+                    chess_board=chess_board,user=user,last_move=last_move)
+
     @tornado.web.authenticated
     def get(self):
-        info_ = ""
-        room_info = hall.get_room_info_with_user(self.current_user)
-        self.render("page/chessboard.html", username=self.current_user, roominfo=room_info, info=info_)
+        self.get_post()
 
     @tornado.web.authenticated
     def post(self):
+        self.get_post()
+
+
+class ActionHandler(BaseHandler):
+
+    def get_post(self):
         action = self.get_argument("action", None)
-        info_ = ""
+        action_result = {"id": -1, "info": "Failure"}
+
         if action:
             if action == "joinroom":
                 roomid = self.get_argument("roomid", None)
                 if roomid:
                     hall.join_room(self.current_user, roomid)
+                    action_result["id"] = 0
+                    action_result["info"] = "Join room success."
                 else:
-                    info_ = "Not legal roomid."
+                    action_result["id"] = -1
+                    action_result["info"] = "Not legal room id."
+
             elif action == "joingame":
-                hall.join_game(self.current_user)
+                if hall.join_game(self.current_user) == 0:
+                    action_result["id"] = 0
+                    action_result["info"] = "Join game success."
+                else:
+                    action_result["id"] = -1
+                    action_result["info"] = "Join game failed, join a room first or have joined game?"
 
             elif action == "gameaction":
                 actionid = self.get_argument("actionid", None)
-                hall.game_action(self.current_user,actionid, self)
+                game_action_result = hall.game_action(self.current_user, actionid, self)
+                if game_action_result.result_id == 0:
+                    action_result["id"] = 0
+                    action_result["info"] = game_action_result.result_info
+                else:
+                    action_result["id"] = -1
+                    action_result["info"] = "Game action failed:" + str(
+                        game_action_result.result_id) + "," + game_action_result.result_info
 
-        room_info = hall.get_room_info_with_user(self.current_user)
-        chess_board = None
-        import ChessHelper
-        if room_info['status'] == 1:
-            ChessHelper.playRandomGame(room_info['room'].board)
-            chess_board = ChessHelper.printBoard2Str(room_info['room'].board)
+            else:
+                action_result["id"] = -1
+                action_result["info"] = "Not recognition action" + action
+        else:
+            action_result["info"] = "Not action arg set"
 
-        # print room_info
-        self.render("page/chessboard.html", username=self.current_user, roominfo=room_info, info=info_,
-                    chess_board=chess_board)
+        # self.write(tornado.escape.json_encode(action_result))
+        self.finish(action_result)
+
+    @tornado.web.authenticated
+    def get(self):
+        self.get_post()
+
+    @tornado.web.authenticated
+    def post(self):
+        self.get_post()
 
 
 class LoginHandler(BaseHandler):
@@ -92,6 +140,7 @@ def main():
     app = tornado.web.Application([
         (r"/", ChessHandler),
         (r"/login", LoginHandler),
+        (r"/action", ActionHandler),
     ], **settings)
     app.listen(11111)
     tornado.ioloop.IOLoop.current().start()

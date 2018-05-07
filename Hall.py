@@ -9,6 +9,7 @@ class User(object):
         self.game_room = None
         self.hall = hall_
         self.game_status = 0
+        self.game_role = -1
 
     def send_message(self):
         pass
@@ -25,6 +26,8 @@ class User(object):
     def join_room(self, room):
         if self.game_room is not None:
             self.game_room.leave_room(self)
+            self.game_status = 0
+            self.game_role = -1
         if room.join_room(self) == GameRoom.ACTION_SUCCESS:
             self.game_room = room
         else:
@@ -32,14 +35,19 @@ class User(object):
 
     def join_game(self):
         if self.game_room is None:
-            return
+            return -1
+        if self.game_status == 1:
+            return -1
         self.game_room.join_game(self);
         self.game_status = 1
+        return 0
+
 
 class ActionResult(object):
-    def __init__(self,result_id_=0,result_info_=""):
-        self.result_id=result_id_
-        self.result_info=result_info_
+    def __init__(self, result_id_=0, result_info_=""):
+        self.result_id = result_id_
+        self.result_info = result_info_
+
 
 class GameRoom(object):
     ACTION_SUCCESS = 0
@@ -52,16 +60,41 @@ class GameRoom(object):
         self.max_player_num = 2
         self.max_user_num = 10000
         self.board = ChessBoard()
+        self.last_status=0;
 
     def broadcast_message_to_all(self, message):
         pass
 
     def send_message(self, to_user_id, message):
         pass
+    def get_last_move(self):
+        (userrole, move_num, row, col) = self.board.get_lastmove()
+        if userrole<0:
+            userrole=-1*self.get_status()-1
+        last_move = {
+            'role': userrole,
+            'move_num': move_num,
+            'row': row,
+            'col': col,
+        }
+        return last_move
 
     def action(self, user, action_code, action_args):
-        if action_code=="set_piece":
-            pass
+        if action_code == "put_piece":
+            piece_i = action_args.get_argument('piece_i', None)
+            piece_j = action_args.get_argument('piece_j', None)
+            if piece_i and piece_j:
+                return_code = self.board.put_piece(int(piece_i), int(piece_j), user.game_role)
+                if return_code >= 0:
+                    return ActionResult(0, "put_piece success:" + str(return_code));
+                else:
+                    return ActionResult(-4, "put_piece failed, because " + str(return_code))
+            else:
+                return ActionResult(-3, "Not set the piece_i and piece_j")
+        elif action_code == "getlastmove":
+            return ActionResult(0, self.get_last_move())
+        else:
+            return ActionResult(-2, "Not recognized game action")
 
     # def join(self, user):
     #     if self.join_game(user) == GameRoom.ACTION_SUCCESS:
@@ -74,7 +107,7 @@ class GameRoom(object):
         if len(self.play_users) >= self.max_player_num:
             return GameRoom.ACTION_FAILURE
         self.play_users.append(user)
-
+        user.game_role = len(self.play_users)
         return GameRoom.ACTION_SUCCESS
 
     def join_room(self, user):
@@ -93,6 +126,16 @@ class GameRoom(object):
             # not in room
             assert False, ""
 
+    def get_status(self):
+        if len(self.play_users)<2:
+            return 1;
+        if len(self.play_users)==2 and self.board.move_num==0:
+            return 2;
+        if len(self.play_users)==2 and not self.board.is_over():
+            return 3;
+        if len(self.play_users) == 2 and self.board.is_over():
+            return 4;
+        return -1;
 
 class Hall(object):
     def __init__(self):
@@ -136,7 +179,8 @@ class Hall(object):
         room_info = {'status': 0, 'roomid': -1}
         user = self.get_user_with_uid(username)
         if user.game_room:
-            room_info['status'] = 1
+
+            room_info['status'] = user.game_room.get_status()
             room_info['roomid'] = user.game_room.room_id
             room_info['room'] = user.game_room
             room_info['users_uid'] = []
@@ -153,9 +197,11 @@ class Hall(object):
 
     def join_game(self, username):
         user = self.get_user_with_uid(username)
-        user.join_game()
+        return user.join_game()
 
     def game_action(self, username, actionid, arg_pack):
         user = self.get_user_with_uid(username)
-        user.game_room.action(user, actionid, arg_pack)
-
+        if user.game_room:
+            return user.game_room.action(user, actionid, arg_pack)
+        else:
+            return ActionResult(-1, "Not in any room")

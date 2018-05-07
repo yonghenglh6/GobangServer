@@ -3,37 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <title>ChessBoard</title>
+    <script type="text/javascript" src="/static/jquery-3.3.1.min.js"></script>
+    <script type="text/javascript">
+        var GLOBAL_room_status={{roominfo['status']}};
+        var GLOBAL_game_status={{user.game_status}};
+
+    </script>
 </head>
 <body>
 
 <div>
     {{username}}, logined.<br/>
 
-    <form action="/?action=joinroom" method="post">
-        房间号: <input type="text" name="roomid" value="">
-        <input type="submit" value="进入">
-    </form>
+    <!--<form action="/?action=joinroom" method="post">-->
+    <!--房间号: <input type="text" name="roomid" value="">-->
+    <!--<input type="submit" value="进入">-->
+    <!--</form>-->
 
-    <div style="">{{info}}</div><br/>
+    <div>
+        房间号:<input type="text" id="join_room_id_text" name="join_room_id" value="">
+        <button id="join_room_button">进入</button>
+    </div>
 
-    {% if roominfo["status"]==1 %}
+    <div style="">{{info}}</div>
+    <br/>
+
+    {% if roominfo["status"]>0 %}
     <div>你已经进入 {{roominfo['roomid']}} 房间</div>
     <div>
-        本房间还有下列用户：
+        本房间共有{{len(roominfo['users_uid'])}}位用户：
         <ul>
             {% for m_username in roominfo['users_uid'] %}
             <li>{{m_username}}</li>
             {% end %}
         </ul>
 
-        <form action="/?action=joingame" method="post">
-            <input type="submit" value="加入游戏">
-        </form>
-    </div>
+        <!--<form action="/?action=joingame" method="post">-->
+        <!--<input type="submit" value="加入游戏">-->
+        <!--</form>-->
 
+
+    </div>
     <div>
-        游戏状态如下：
+        {% if user.game_status==0 %}
+        您正在观战。
+        <button id="join_game_button">加入游戏</button>
+        {% elif user.game_status==1 %}
+        {% if user.game_role==1 %}
+        你是 黑方
+        {% else %}
+        你是 白方
+        {% end %}
+        {% else %}
+        当前状态不太对，是不是除了啥bug啊。
+        {% end %}
+
+    </div>
+    <div>
         <div>
+            <div class="GameRoomStatus">
+                {% if roominfo['status']==0 %}
+                异常，你没有进入本房间.
+                {% elif roominfo['status']==1 %}
+                正在等待选手加入.
+                {% elif roominfo['status']==2 %}
+                选手满了，请黑方开始战斗.
+                {% elif roominfo['status']==3 %}
+                当前轮到{{"黑方" if chess_board.get_current_user()==1 else "白方"}}行动。
+                {% elif roominfo['status']==4 %}
+                游戏结束，{{"黑方" if chess_board.get_winner()==1 else "白方"}}获胜。
+                {% end %}
+
+            </div>
             <style>
                 .qipan_block{
                     background-repeat: no-repeat;
@@ -51,28 +92,151 @@
                                     background-image: url(/static/white.png);
                 }
 
+                .GameRoomStatus{
+                   font-size:60px;
+                }
+
+
             </style>
-            <table border="0" cellpadding="0" cellspacing="0" style="border-spacing: 0px;border-collapse:collapse;border-style:none">
-            {% for i in range(roominfo['room'].board.SIZE) %}
+            <input type="hidden" id="last_move_info" role={{last_move['role']}} move_num={{last_move['move_num']}}
+                   row={{last_move['row']}} col={{last_move['col']}}>
+            <script type="text/javascript">
+            $(document).ready(function(){
+                  function check_last_move(){
+
+                       $.post("/action?action=gameaction",
+                        {
+                            actionid: "getlastmove",
+                            },function(data,status){
+                        var jsondata=eval(data);
+                        if(jsondata["id"]==0){
+                            var r_role=jsondata["info"]["role"];
+                            var r_move_num=jsondata["info"]["move_num"];
+                            var r_row=jsondata["info"]["row"];
+                            var r_col=jsondata["info"]["col"];
+
+                            var l_role=$("#last_move_info").attr("role");
+                            var l_move_num=$("#last_move_info").attr("move_num");
+                            var l_row=$("#last_move_info").attr("row");
+                            var l_col=$("#last_move_info").attr("col");
+
+                            <!-- //alert(r_role==l_role);-->
+
+                            if(r_role==l_role && r_move_num==l_move_num &&r_row==l_row &&r_col==l_col){
+
+                            }else{
+                                $(location).attr('href', '/');
+                            }
+
+
+                        }else{
+                            $(location).attr('href', '/');
+                        }
+                        });
+                  }
+                  setInterval(check_last_move,500);
+            });
+
+
+            </script>
+            <table border="0" cellpadding="0" cellspacing="0"
+                   style="border-spacing: 0px;border-collapse:collapse;border-style:none">
+                {% for i in range(roominfo['room'].board.SIZE) %}
                 <tr>
 
-            {% for j in range(roominfo['room'].board.SIZE) %}
-            {% if roominfo['room'].board.get_piece(i - 1, j - 1)==0 %}
-                    <td  height="34" width="34" class="qipan_block qipan_block_blank"></td>
-            {% elif roominfo['room'].board.get_piece(i - 1, j - 1)==1 %}
-                <td  height="34" width="34" class="qipan_block qipan_block_black"></td>
-            {% elif roominfo['room'].board.get_piece(i - 1, j - 1)==2 %}
-                <td  height="34" width="34" class="qipan_block qipan_block_white"></td>
-            {% end%}
-            {% end%}
+                    {% for j in range(roominfo['room'].board.SIZE) %}
+                    {% if roominfo['room'].board.get_piece(i, j)==0 %}
+                    <td height="34" width="34" class="qipan_block qipan_block_blank chess_piece_button" piece_i="{{i}}"
+                        piece_j={{j}}></td>
+                    <!--<a href="/?action=gameaction&actionid=set_piece&piece_i={{i}}&piece_j={{j}}"><img src="/static/touming.png"/></a>-->
+                    {% elif roominfo['room'].board.get_piece(i, j)==1 %}
+                    <td height="34" width="34" class="qipan_block qipan_block_black"></td>
+                    {% elif roominfo['room'].board.get_piece(i , j)==2 %}
+                    <td height="34" width="34" class="qipan_block qipan_block_white"></td>
+                    {% else %}
+                    not legal {{roominfo['room'].board.get_piece(i , j)}}
+                    {% end%}
+                    {% end%}
                 </tr>
 
-            {% end%}
+                {% end%}
             </table>
         </div>
     </div>
     {% elif roominfo["status"]==0 %}
     {% end%}
 </div>
+<script type="text/javascript">
+$(document).ready(function(){
+  $("#join_room_button").click(function(){
+
+    if($("#join_room_id_text").val()==""){
+        alert("No room id be input.");
+        return;
+    }
+    $.post("/action?action=joinroom",
+    {
+        roomid: $("#join_room_id_text").val(),
+    },function(data,status){
+    var jsondata=eval(data);
+    if(jsondata["id"]==0){
+        //alert(jsondata["info"]);
+        $(location).attr('href', '/');
+    }else{
+        alert(jsondata["info"]);
+    }
+    //alert("Data: " + jsondata["id"] + "\nStatus: " + status);
+
+    });
+  });
+
+  $("#join_game_button").click(function(){
+    $.post("/action?action=joingame",
+    {
+        },function(data,status){
+    var jsondata=eval(data);
+    if(jsondata["id"]==0){
+        $(location).attr('href', '/');
+    }else{
+        alert(jsondata["info"]);
+    }
+    });
+  });
+
+  $(".chess_piece_button").click(function(){
+    if(GLOBAL_room_status!=2 && GLOBAL_room_status!=3)
+      return;
+
+    if(GLOBAL_game_status!=1)
+      return;
+
+    piece_i_value=$(this).attr("piece_i");
+    piece_j_value=$(this).attr("piece_j");
+    $.post("/action?action=gameaction",
+    {
+        actionid: "put_piece",
+        piece_i:  piece_i_value,
+        piece_j:  piece_j_value,
+        },function(data,status){
+    var jsondata=eval(data);
+    if(jsondata["id"]==0){
+        $(location).attr('href', '/');
+    }else{
+        alert("非法行子或不是你的回合。"+jsondata["info"]);
+    }
+    });
+  });
+
+
+
+
+});
+
+
+
+
+
+
+</script>
 </body>
 </html>
