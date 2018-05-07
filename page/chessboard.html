@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ChessBoard</title>
+</head>
+<body>
+
+<div>
+    {{username}}, logined.<br/>
+
+    <form action="/?action=joinroom" method="post">
+        房间号: <input type="text" name="roomid" value="">
+        <input type="submit" value="进入">
+    </form>
+
+    <div style="">{{info}}</div><br/>
+
+    {% if roominfo["status"]==1 %}
+    <div>你已经进入 {{roominfo['roomid']}} 房间</div>
+    <div>
+        本房间还有下列用户：
+        <ul>
+            {% for m_username in roominfo['users_uid'] %}
+            <li>{{m_username}}</li>
+            {% end %}
+        </ul>
+
+        <form action="/?action=joingame" method="post">
+            <input type="submit" value="加入游戏">
+        </form>
+    </div>
+
+    <div>
+        游戏状态如下：
+        <div>
+            <style>
+                .qipan_block{
+                    background-repeat: no-repeat;
+                    background-position-x: center;
+                    background-position-y: center;
+                    background-size: 34px 34px;
+                }
+                .qipan_block_blank{
+                                    background-image: url(/static/blank.png);
+                }
+                .qipan_block_black{
+                                    background-image: url(/static/black.png);
+                }
+                .qipan_block_white{
+                                    background-image: url(/static/white.png);
+                }
+
+            </style>
+            <table border="0" cellpadding="0" cellspacing="0" style="border-spacing: 0px;border-collapse:collapse;border-style:none">
+            {% for i in range(roominfo['room'].board.SIZE) %}
+                <tr>
+
+            {% for j in range(roominfo['room'].board.SIZE) %}
+            {% if roominfo['room'].board.get_piece(i - 1, j - 1)==0 %}
+                    <td  height="34" width="34" class="qipan_block qipan_block_blank"></td>
+            {% elif roominfo['room'].board.get_piece(i - 1, j - 1)==1 %}
+                <td  height="34" width="34" class="qipan_block qipan_block_black"></td>
+            {% elif roominfo['room'].board.get_piece(i - 1, j - 1)==2 %}
+                <td  height="34" width="34" class="qipan_block qipan_block_white"></td>
+            {% end%}
+            {% end%}
+                </tr>
+
+            {% end%}
+            </table>
+        </div>
+    </div>
+    {% elif roominfo["status"]==0 %}
+    {% end%}
+</div>
+</body>
+</html>
