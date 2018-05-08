@@ -1,5 +1,6 @@
-
 # -*- coding: utf-8 -*-
+import threading
+
 import requests
 import cookielib
 from bs4 import BeautifulSoup
@@ -132,7 +133,7 @@ class GameStrategy():
         random.shuffle(self._chess_helper_move_set)
         self.try_step = 0
 
-    def play_one_piece(self, gameboard):
+    def play_one_piece(self, user, gameboard):
         move = self._chess_helper_move_set[self.try_step]
         while gameboard.get_piece(move[0], move[1]) != 0 and self.try_step < 15 * 15:
             self.try_step += 1
@@ -141,59 +142,101 @@ class GameStrategy():
         return move
 
 
-strategy=GameStrategy()
+class GameCommunicator(threading.Thread):
+    def __init__(self, roomid, stragegy):
+        threading.Thread.__init__(self)
+        self.room_id = roomid
+        self.stragegy = stragegy;
 
-client = ChessClient()
-client.login_in_guest()
-client.join_room(17)
-client.join_game()
-user = client.get_user_info()
-print "加入游戏成功，你是:" + ("黑方" if user.game_role == 1 else "白方")
+    def run(self):
+        client = ChessClient()
+        client.login_in_guest()
+        client.join_room(self.room_id)
+        client.join_game()
+        while True:
+            wait_time = client.wait_game_info_changed()
+            room = client.get_room_info()
+            # room=GameRoom()
+            user = client.get_user_info()
+            # user=User()
+            gameboard = client.get_game_info()
+            # gameboard = ChessBoard()
+            if room.get_status() == 1:
+                continue
+            elif room.get_status() == 2:
+                if gameboard.get_current_user() == user.game_role:
+                    one_piece = self.stragegy.play_one_piece(user, gameboard)
+                    action_result = client.put_piece(*one_piece)
+                    if action_result['id'] != 0:
+                        print ChessHelper.numToAlp(one_legal_piece[0]), ChessHelper.numToAlp(one_legal_piece[1])
+                        print action_result['info']
+                        break
+                continue
+            elif room.get_status() == 3:
+                if gameboard.get_current_user() == user.game_role:
+                    one_legal_piece = self.stragegy.play_one_piece(user,gameboard)
+                    action_result = client.put_piece(*one_legal_piece)
+                    if action_result['id'] != 0:
+                        print ChessHelper.numToAlp(one_legal_piece[0]), ChessHelper.numToAlp(one_legal_piece[1])
+                        print action_result['info']
+                        break
+                continue
+            elif room.get_status() == 4:
+                break
 
-while True:
-    wait_time = client.wait_game_info_changed()
-    print 'wait_time:', wait_time
 
-    room = client.get_room_info()
-    # room=GameRoom()
+if __name__ == "__main__":
+    strategy = GameStrategy()
+    client = ChessClient()
+    client.login_in_guest()
+    client.join_room(100)
+    client.join_game()
     user = client.get_user_info()
-    # user=User()
-    gameboard = client.get_game_info()
-    # gameboard = ChessBoard()
+    print "加入游戏成功，你是:" + ("黑方" if user.game_role == 1 else "白方")
+    while True:
+        wait_time = client.wait_game_info_changed()
+        print 'wait_time:', wait_time
 
-    print 'room.get_status():', room.get_status()
-    print 'user.game_status():', user.game_status
-    print 'gameboard.game_status():'
-    ChessHelper.printBoard(gameboard)
+        room = client.get_room_info()
+        # room=GameRoom()
+        user = client.get_user_info()
+        # user=User()
+        gameboard = client.get_game_info()
+        # gameboard = ChessBoard()
 
-    if room.get_status() == 1:
-        print "等待另一个对手加入游戏:"
-        continue
-    elif room.get_status() == 2:
-        print "选手已经满了，开始游戏："
-        if gameboard.get_current_user() == user.game_role:
-            print "轮到你走："
-            one_legal_piece = strategy.play_one_piece(gameboard)
-            action_result=client.put_piece(*one_legal_piece)
-            if action_result['id']!=0:
-                print "走棋失败:"
-                print action_result['info']
-        else:
-            print "轮到对手走...."
-        continue
-    elif room.get_status() == 3:
-        if gameboard.get_current_user() == user.game_role:
-            print "轮到你走："
-            one_legal_piece = strategy.play_one_piece(gameboard)
-            action_result=client.put_piece(*one_legal_piece)
-            if action_result['id']!=0:
-                print "走棋失败:"
-                print ChessHelper.numToAlp(one_legal_piece[0]),ChessHelper.numToAlp(one_legal_piece[1])
-                print action_result['info']
-                
-        else:
-            print "轮到对手走...."
-        continue
-    elif room.get_status() == 4:
-        print "游戏已经结束了," + ("黑方" if gameboard.get_winner() == 1 else "白方") + " 赢了"
-        break
+        print 'room.get_status():', room.get_status()
+        print 'user.game_status():', user.game_status
+        print 'gameboard.game_status():'
+        ChessHelper.printBoard(gameboard)
+
+        if room.get_status() == 1:
+            print "等待另一个对手加入游戏:"
+            continue
+        elif room.get_status() == 2:
+            print "选手已经满了，开始游戏："
+            if gameboard.get_current_user() == user.game_role:
+                print "轮到你走："
+                one_legal_piece = strategy.play_one_piece(user,gameboard)
+                action_result = client.put_piece(*one_legal_piece)
+                if action_result['id'] != 0:
+                    print "走棋失败:"
+                    print action_result['info']
+            else:
+                print "轮到对手走...."
+            continue
+        elif room.get_status() == 3:
+            if gameboard.get_current_user() == user.game_role:
+                print "轮到你走："
+                one_legal_piece = strategy.play_one_piece(user,gameboard)
+                action_result = client.put_piece(*one_legal_piece)
+                if action_result['id'] != 0:
+                    print "走棋失败:"
+                    print ChessHelper.numToAlp(one_legal_piece[0]), ChessHelper.numToAlp(one_legal_piece[1])
+                    print action_result['info']
+
+            else:
+                print "轮到对手走...."
+            continue
+        elif room.get_status() == 4:
+            print "游戏已经结束了," + ("黑方" if gameboard.get_winner() == 1 else "白方") + " 赢了"
+            break

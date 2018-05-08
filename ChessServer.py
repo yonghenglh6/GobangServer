@@ -2,6 +2,7 @@ import tornado.ioloop
 import tornado.web
 import os
 
+from ChessClient import GameStrategy, GameCommunicator
 from Hall import Hall
 from Hall import GameRoom
 from Hall import User
@@ -18,23 +19,22 @@ class ChessHandler(BaseHandler):
 
     def get_post(self):
         info_ = ""
-        user=hall.get_user_with_uid(self.current_user)
+        user = hall.get_user_with_uid(self.current_user)
         room_info = hall.get_room_info_with_user(self.current_user)
         chess_board = None
-        last_move=None
+        last_move = None
         room_status = 0
         import ChessHelper
-        if room_info['status'] >0:
+        if room_info['status'] > 0:
             # ChessHelper.playRandomGame(room_info['room'].board)\
-            room=room_info['room']
-            chess_board=room.board
-            last_move=room.get_last_move()
+            room = room_info['room']
+            chess_board = room.board
+            last_move = room.get_last_move()
             # chess_board = ChessHelper.printBoard2Str(room_info['room'].board)
-
 
         # print room_info
         self.render("page/chessboard.html", username=self.current_user, roominfo=room_info, info=info_,
-                    chess_board=chess_board,user=user,last_move=last_move)
+                    chess_board=chess_board, user=user, last_move=last_move)
 
     @tornado.web.authenticated
     def get(self):
@@ -66,6 +66,12 @@ class ActionHandler(BaseHandler):
                 if hall.join_game(self.current_user) == 0:
                     action_result["id"] = 0
                     action_result["info"] = "Join game success."
+                    room = hall.get_user_with_uid(self.current_user).game_room
+                    if str(room.room_id).startswith('ai_'):
+                        strg = GameStrategy()
+                        commu = GameCommunicator(room.room_id, strg)
+                        commu.start()
+
                 else:
                     action_result["id"] = -1
                     action_result["info"] = "Join game failed, join a room first or have joined game or game is full."
@@ -80,15 +86,15 @@ class ActionHandler(BaseHandler):
                     action_result["id"] = -1
                     action_result["info"] = "Game action failed:" + str(
                         game_action_result.result_id) + "," + game_action_result.result_info
-            elif action=="getboardinfo":
-                room=hall.get_room_with_user(self.current_user)
+            elif action == "getboardinfo":
+                room = hall.get_room_with_user(self.current_user)
                 # room=GameRoom()
                 if room:
                     action_result["id"] = 0
-                    action_result["info"] =room.board.dumps()
+                    action_result["info"] = room.board.dumps()
                 else:
                     action_result["id"] = -1
-                    action_result["info"]="Not in room, please join one."
+                    action_result["info"] = "Not in room, please join one."
             else:
                 action_result["id"] = -1
                 action_result["info"] = "Not recognition action" + action
@@ -136,7 +142,7 @@ class LoginHandler(BaseHandler):
             if username:
                 self.set_secure_cookie("username", username)
                 self.redirect("/")
-        elif action=="logout":
+        elif action == "logout":
             if self.current_user is not None:
                 self.clear_cookie("username")
                 hall.logout(self.current_user)
@@ -149,6 +155,7 @@ class LoginHandler(BaseHandler):
 
     def post(self):
         self.get_post()
+
 
 class LogoutHandler(BaseHandler):
     def get(self):
