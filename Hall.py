@@ -1,7 +1,7 @@
 import sys
 
 from ChessBoard import ChessBoard
-
+import cPickle as pickle
 
 class User(object):
     def __init__(self, uid_, hall_):
@@ -38,9 +38,11 @@ class User(object):
             return -1
         if self.game_status == 1:
             return -1
-        self.game_room.join_game(self);
-        self.game_status = 1
-        return 0
+        if self.game_room.join_game(self) == GameRoom.ACTION_SUCCESS:
+            self.game_status = 1
+            return 0
+        else:
+            return -1
 
 
 class ActionResult(object):
@@ -60,17 +62,18 @@ class GameRoom(object):
         self.max_player_num = 2
         self.max_user_num = 10000
         self.board = ChessBoard()
-        self.last_status=0;
+        self.last_status = 0;
 
     def broadcast_message_to_all(self, message):
         pass
 
     def send_message(self, to_user_id, message):
         pass
+
     def get_last_move(self):
         (userrole, move_num, row, col) = self.board.get_lastmove()
-        if userrole<0:
-            userrole=-1*self.get_status()-1
+        if userrole < 0:
+            userrole = -1 * self.get_status() - 1
         last_move = {
             'role': userrole,
             'move_num': move_num,
@@ -93,6 +96,12 @@ class GameRoom(object):
                 return ActionResult(-3, "Not set the piece_i and piece_j")
         elif action_code == "getlastmove":
             return ActionResult(0, self.get_last_move())
+        elif action_code == "get_room_info":
+            return ActionResult(0, pickle.dumps(self))
+        elif action_code == "get_game_info":
+            return ActionResult(0, pickle.dumps(self.board))
+        elif action_code == "get_user_info":
+            return ActionResult(0, pickle.dumps(user))
         else:
             return ActionResult(-2, "Not recognized game action")
 
@@ -127,15 +136,34 @@ class GameRoom(object):
             assert False, ""
 
     def get_status(self):
-        if len(self.play_users)<2:
+        if self.board.is_over():
+            return 4;
+        if len(self.play_users) < 2:
             return 1;
-        if len(self.play_users)==2 and self.board.move_num==0:
+        if len(self.play_users) == 2 and self.board.move_num == 0:
             return 2;
-        if len(self.play_users)==2 and not self.board.is_over():
+        if len(self.play_users) == 2 and not self.board.is_over():
             return 3;
         if len(self.play_users) == 2 and self.board.is_over():
             return 4;
         return -1;
+
+    # def get_room_info(self):
+    #     room_info = {'status': 0, 'roomid': -1}
+    #     room_info['status'] = self.get_status()
+    #     room_info['roomid'] = self.room_id
+    #     room_info['room'] = self
+    #     room_info['users_uid'] = []
+    #     room_info['play_users_uid'] = []
+    #     room_info['users'] = []
+    #     room_info['play_users'] = []
+    #     for user in self.users:
+    #         room_info['users_uid'].append(user.uid)
+    #         room_info['users'].append(user)
+    #     for user in user.game_room.play_users:
+    #         room_info['play_users_uid'].append(user.uid)
+    #         room_info['play_users'].append(user)
+
 
 class Hall(object):
     def __init__(self):
@@ -195,6 +223,12 @@ class Hall(object):
                 room_info['play_users'].append(user)
         return room_info
 
+    def get_room_with_user(self,username):
+        user = self.get_user_with_uid(username)
+        if user.game_room:
+            return user.game_room
+        return None
+
     def join_game(self, username):
         user = self.get_user_with_uid(username)
         return user.join_game()
@@ -205,3 +239,9 @@ class Hall(object):
             return user.game_room.action(user, actionid, arg_pack)
         else:
             return ActionResult(-1, "Not in any room")
+
+    def logout(self,username):
+        user = self.get_user_with_uid(username)
+        if user.game_room:
+            user.game_room.leave_room(user)
+            self.uid2user.pop(username)

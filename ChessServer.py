@@ -3,6 +3,8 @@ import tornado.web
 import os
 
 from Hall import Hall
+from Hall import GameRoom
+from Hall import User
 
 hall = Hall()
 
@@ -66,7 +68,7 @@ class ActionHandler(BaseHandler):
                     action_result["info"] = "Join game success."
                 else:
                     action_result["id"] = -1
-                    action_result["info"] = "Join game failed, join a room first or have joined game?"
+                    action_result["info"] = "Join game failed, join a room first or have joined game or game is full."
 
             elif action == "gameaction":
                 actionid = self.get_argument("actionid", None)
@@ -78,7 +80,15 @@ class ActionHandler(BaseHandler):
                     action_result["id"] = -1
                     action_result["info"] = "Game action failed:" + str(
                         game_action_result.result_id) + "," + game_action_result.result_info
-
+            elif action=="getboardinfo":
+                room=hall.get_room_with_user(self.current_user)
+                # room=GameRoom()
+                if room:
+                    action_result["id"] = 0
+                    action_result["info"] =room.board.dumps()
+                else:
+                    action_result["id"] = -1
+                    action_result["info"]="Not in room, please join one."
             else:
                 action_result["id"] = -1
                 action_result["info"] = "Not recognition action" + action
@@ -98,12 +108,16 @@ class ActionHandler(BaseHandler):
 
 
 class LoginHandler(BaseHandler):
-    def get(self):
-        self.render('page/login.html')
 
-    def post(self):
+    def get_post(self):
+
         action = self.get_argument("action", None)
+
         if action == "login":
+            if self.current_user is not None:
+                self.clear_cookie("username")
+                hall.logout(self.current_user)
+
             username = self.get_argument("username")
             password = self.get_argument("password")
             username = hall.login(username, password)
@@ -113,14 +127,28 @@ class LoginHandler(BaseHandler):
             else:
                 self.redirect("/login?status=wrong_password_or_name")
         elif action == "login_in_guest":
+            if self.current_user is not None:
+                self.clear_cookie("username")
+                hall.logout(self.current_user)
+
             username = hall.login_in_guest()
             print username
             if username:
                 self.set_secure_cookie("username", username)
                 self.redirect("/")
+        elif action=="logout":
+            if self.current_user is not None:
+                self.clear_cookie("username")
+                hall.logout(self.current_user)
+            self.redirect("/login")
         else:
             self.render('page/login.html')
 
+    def get(self):
+        self.get_post()
+
+    def post(self):
+        self.get_post()
 
 class LogoutHandler(BaseHandler):
     def get(self):

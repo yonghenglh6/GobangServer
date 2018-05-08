@@ -8,35 +8,35 @@
         var GLOBAL_room_status={{roominfo['status']}};
         var GLOBAL_game_status={{user.game_status}};
 
+
     </script>
 </head>
 <body>
 
 <div>
-    {{username}}, logined.<br/>
-
-    <!--<form action="/?action=joinroom" method="post">-->
-    <!--房间号: <input type="text" name="roomid" value="">-->
-    <!--<input type="submit" value="进入">-->
-    <!--</form>-->
-
     <div>
+        <span id="username">{{username}}</span>
+        , <a href="/login?action=logout">退出登录</a>.
+
+        <!--<form action="/?action=joinroom" method="post">-->
+        <!--房间号: <input type="text" name="roomid" value="">-->
+        <!--<input type="submit" value="进入">-->
+        <!--</form>-->
+
+
         房间号:<input type="text" id="join_room_id_text" name="join_room_id" value="">
         <button id="join_room_button">进入</button>
     </div>
 
     <div style="">{{info}}</div>
-    <br/>
-
     {% if roominfo["status"]>0 %}
-    <div>你已经进入 {{roominfo['roomid']}} 房间</div>
     <div>
-        本房间共有{{len(roominfo['users_uid'])}}位用户：
-        <ul>
-            {% for m_username in roominfo['users_uid'] %}
-            <li>{{m_username}}</li>
-            {% end %}
-        </ul>
+        你已经进入 {{roominfo['roomid']}} 房间,本房间共有{{len(roominfo['users_uid'])}}位用户：
+
+        {% for m_username in roominfo['users_uid'] %}
+        | {{m_username}}
+        {% end %}
+
 
         <!--<form action="/?action=joingame" method="post">-->
         <!--<input type="submit" value="加入游戏">-->
@@ -69,7 +69,11 @@
                 {% elif roominfo['status']==2 %}
                 选手满了，请黑方开始战斗.
                 {% elif roominfo['status']==3 %}
-                当前轮到{{"黑方" if chess_board.get_current_user()==1 else "白方"}}行动。
+                {% if chess_board.get_current_user()==user.game_role %}
+                当前轮到你行动
+                {% else %}
+                请等待对方下子
+                {% end %}
                 {% elif roominfo['status']==4 %}
                 游戏结束，{{"黑方" if chess_board.get_winner()==1 else "白方"}}获胜。
                 {% end %}
@@ -93,8 +97,10 @@
                 }
 
                 .GameRoomStatus{
-                   font-size:60px;
+                   font-size:30px;
                 }
+
+
 
 
             </style>
@@ -138,6 +144,8 @@
             });
 
 
+
+
             </script>
             <table border="0" cellpadding="0" cellspacing="0"
                    style="border-spacing: 0px;border-collapse:collapse;border-style:none">
@@ -150,9 +158,17 @@
                         piece_j={{j}}></td>
                     <!--<a href="/?action=gameaction&actionid=set_piece&piece_i={{i}}&piece_j={{j}}"><img src="/static/touming.png"/></a>-->
                     {% elif roominfo['room'].board.get_piece(i, j)==1 %}
-                    <td height="34" width="34" class="qipan_block qipan_block_black"></td>
+                    <td height="34" width="34" class="qipan_block qipan_block_black">
+                        {% if i== last_move['row'] and j== last_move['col']%}
+                        AA
+                        {% end %}
+                    </td>
                     {% elif roominfo['room'].board.get_piece(i , j)==2 %}
-                    <td height="34" width="34" class="qipan_block qipan_block_white"></td>
+                    <td height="34" width="34" class="qipan_block qipan_block_white">
+                        {% if i== last_move['row'] and j== last_move['col']%}
+                        AA
+                        {% end %}
+                    </td>
                     {% else %}
                     not legal {{roominfo['room'].board.get_piece(i , j)}}
                     {% end%}
@@ -231,6 +247,8 @@ $(document).ready(function(){
 
 
 });
+
+
 
 
 
