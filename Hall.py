@@ -3,6 +3,7 @@ import sys
 from ChessBoard import ChessBoard
 import cPickle as pickle
 
+
 class User(object):
     def __init__(self, uid_, hall_):
         self.uid = uid_
@@ -135,13 +136,19 @@ class GameRoom(object):
             # not in room
             assert False, ""
 
+    ROOM_STATUS_FINISH = 4
+    ROOM_STATUS_WAITJOIN = 1
+    ROOM_STATUS_JUSTBEGIN = 2
+    ROOM_STATUS_PLAYING = 3
+    ROOM_STATUS_WRONG = -1
+
     def get_status(self):
         if self.board.is_over():
             return 4;
         if len(self.play_users) < 2:
             return 1;
-        if len(self.play_users) == 2 and self.board.move_num == 0:
-            return 2;
+        # if len(self.play_users) == 2 and self.board.move_num == 0:
+        #     return 2;
         if len(self.play_users) == 2 and not self.board.is_over():
             return 3;
         if len(self.play_users) == 2 and self.board.is_over():
@@ -223,7 +230,7 @@ class Hall(object):
                 room_info['play_users'].append(user)
         return room_info
 
-    def get_room_with_user(self,username):
+    def get_room_with_user(self, username):
         user = self.get_user_with_uid(username)
         if user.game_room:
             return user.game_room
@@ -240,7 +247,7 @@ class Hall(object):
         else:
             return ActionResult(-1, "Not in any room")
 
-    def logout(self,username):
+    def logout(self, username):
         user = self.get_user_with_uid(username)
         if user.game_room:
             user.game_room.leave_room(user)

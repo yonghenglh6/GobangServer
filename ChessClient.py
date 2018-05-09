@@ -11,6 +11,7 @@ import cPickle as pickle
 import ChessHelper
 from ChessBoard import ChessBoard
 from Hall import GameRoom
+from Hall import User
 import random
 
 GAME_URL = 'http://127.0.0.1:11111'
@@ -126,6 +127,21 @@ class ChessClient():
 
 class GameStrategy():
     def __init__(self):
+        import gobang
+        self.searcher = gobang.searcher()
+
+    def play_one_piece(self, user, gameboard):
+        # user = User()
+        # gameboard = ChessBoard()
+        turn = user.game_role
+        self.searcher.board = [[gameboard.get_piece(m, n) for n in xrange(gameboard.SIZE)] for m in xrange(gameboard.SIZE)]
+        score, row, col=self.searcher.search(turn,2)
+        print "score:",score
+        return (row, col)
+
+
+class GameStrategy_random():
+    def __init__(self):
         self._chess_helper_move_set = []
         for i in range(15):
             for j in range(15):
@@ -174,7 +190,7 @@ class GameCommunicator(threading.Thread):
                 continue
             elif room.get_status() == 3:
                 if gameboard.get_current_user() == user.game_role:
-                    one_legal_piece = self.stragegy.play_one_piece(user,gameboard)
+                    one_legal_piece = self.stragegy.play_one_piece(user, gameboard)
                     action_result = client.put_piece(*one_legal_piece)
                     if action_result['id'] != 0:
                         print ChessHelper.numToAlp(one_legal_piece[0]), ChessHelper.numToAlp(one_legal_piece[1])
@@ -189,7 +205,7 @@ if __name__ == "__main__":
     strategy = GameStrategy()
     client = ChessClient()
     client.login_in_guest()
-    client.join_room(100)
+    client.join_room(101)
     client.join_game()
     user = client.get_user_info()
     print "加入游戏成功，你是:" + ("黑方" if user.game_role == 1 else "白方")
@@ -216,7 +232,7 @@ if __name__ == "__main__":
             print "选手已经满了，开始游戏："
             if gameboard.get_current_user() == user.game_role:
                 print "轮到你走："
-                one_legal_piece = strategy.play_one_piece(user,gameboard)
+                one_legal_piece = strategy.play_one_piece(user, gameboard)
                 action_result = client.put_piece(*one_legal_piece)
                 if action_result['id'] != 0:
                     print "走棋失败:"
@@ -227,7 +243,7 @@ if __name__ == "__main__":
         elif room.get_status() == 3:
             if gameboard.get_current_user() == user.game_role:
                 print "轮到你走："
-                one_legal_piece = strategy.play_one_piece(user,gameboard)
+                one_legal_piece = strategy.play_one_piece(user, gameboard)
                 action_result = client.put_piece(*one_legal_piece)
                 if action_result['id'] != 0:
                     print "走棋失败:"
