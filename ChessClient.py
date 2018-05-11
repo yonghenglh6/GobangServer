@@ -13,6 +13,7 @@ from ChessBoard import ChessBoard
 from Hall import GameRoom
 from Hall import User
 import random
+import os
 
 GAME_URL = 'http://127.0.0.1:11111'
 
@@ -25,9 +26,9 @@ class ChessClient():
         # self.session.cookies = http.cookiejar.LWPCookieJar("cookie")
         agent = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Maxthon/5.1.2.3000 Chrome/55.0.2883.75 Safari/537.36'
         self.headers = {
-            "Host": "www.zhihu.com",
-            "Origin": "https://www.zhihu.com/",
-            "Referer": "http://www.zhihu.com/",
+            "Host": "http://127.0.0.1:11111",
+            "Origin": "http://127.0.0.1:11111",
+            "Referer": "http://127.0.0.1:11111",
             'User-Agent': agent
         }
 
@@ -134,9 +135,40 @@ class GameStrategy():
         # user = User()
         # gameboard = ChessBoard()
         turn = user.game_role
-        self.searcher.board = [[gameboard.get_piece(m, n) for n in xrange(gameboard.SIZE)] for m in xrange(gameboard.SIZE)]
-        score, row, col=self.searcher.search(turn,2)
-        print "score:",score
+        self.searcher.board = [[gameboard.get_piece(m, n) for n in xrange(gameboard.SIZE)] for m in
+                               xrange(gameboard.SIZE)]
+        # gameboard=ChessBoard()
+        # gameboard.move_history
+        score, row, col = self.searcher.search(turn, 2)
+        print "score:", score
+        return (row, col)
+
+
+class GameStrategy_yixin():
+
+    def __init__(self):
+        self.muid = str(random.randint(0,1000000))
+        self.comm_folder='yixin_comm/'
+        if not os.path.exists(self.comm_folder):
+            os.makedirs(self.comm_folder)
+        self.chess_state_file = self.comm_folder+'game_state_' + self.muid
+        self.action_file = self.comm_folder+'action_' + self.muid
+
+
+    def play_one_piece(self, user, gameboard):
+        # user = User()
+        # gameboard = ChessBoard()
+        with open(self.chess_state_file, 'w') as chess_state_file:
+            for userrole, move_num, row, col in gameboard.move_history:
+                chess_state_file.write('%d %d\n' % (row, col))
+        if os.path.exists(self.action_file):
+            os.remove(self.action_file)
+        os.system("yixin.exe %s %s" % (self.chess_state_file, self.action_file))
+        row,col = random.randint(0,15),random.randint(0,15)
+        with open(self.action_file) as action_file:
+            line = action_file.readline()
+            row, col = line.strip().split()
+
         return (row, col)
 
 
@@ -202,10 +234,25 @@ class GameCommunicator(threading.Thread):
 
 
 if __name__ == "__main__":
-    strategy = GameStrategy()
+
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--room_name',type=str,default='default')
+    parser.add_argument('--server_url',default='http://127.0.0.1:11111')
+    parser.add_argument('--ai', default='random')
+    args=parser.parse_args()
+    GAME_URL=args.server_url
+    if args.ai=='random':
+        strategy = GameStrategy_random()
+    elif args.ai=='normal':
+        strategy = GameStrategy()
+    elif args.ai=='yixin':
+        strategy = GameStrategy_yixin()
+    else:
+        assert False,"Not recog ai."
     client = ChessClient()
     client.login_in_guest()
-    client.join_room(101)
+    client.join_room(args.room_name)
     client.join_game()
     user = client.get_user_info()
     print "加入游戏成功，你是:" + ("黑方" if user.game_role == 1 else "白方")
