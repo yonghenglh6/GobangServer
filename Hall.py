@@ -137,23 +137,21 @@ class GameRoom(object):
             assert False, ""
 
     ROOM_STATUS_FINISH = 4
-    ROOM_STATUS_WAITJOIN = 1
-    ROOM_STATUS_JUSTBEGIN = 2
+    ROOM_STATUS_NOONE = 1
+    ROOM_STATUS_ONEWAITING = 2
     ROOM_STATUS_PLAYING = 3
     ROOM_STATUS_WRONG = -1
 
     def get_status(self):
         if self.board.is_over():
-            return 4;
-        if len(self.play_users) < 2:
-            return 1;
-        # if len(self.play_users) == 2 and self.board.move_num == 0:
-        #     return 2;
-        if len(self.play_users) == 2 and not self.board.is_over():
-            return 3;
-        if len(self.play_users) == 2 and self.board.is_over():
-            return 4;
-        return -1;
+            return GameRoom.ROOM_STATUS_FINISH;
+        if len(self.play_users) == 0:
+            return GameRoom.ROOM_STATUS_NOONE;
+        if len(self.play_users) == 1:
+            return GameRoom.ROOM_STATUS_ONEWAITING;
+        if len(self.play_users) == 2:
+            return GameRoom.ROOM_STATUS_PLAYING;
+        return GameRoom.ROOM_STATUS_WRONG;
 
     # def get_room_info(self):
     #     room_info = {'status': 0, 'roomid': -1}

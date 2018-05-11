@@ -66,11 +66,11 @@ class ActionHandler(BaseHandler):
                 if hall.join_game(self.current_user) == 0:
                     action_result["id"] = 0
                     action_result["info"] = "Join game success."
-                    room = hall.get_user_with_uid(self.current_user).game_room
-                    if str(room.room_id).startswith('ai_') and room.get_status() == GameRoom.ROOM_STATUS_WAITJOIN:
-                        strg = GameStrategy()
-                        commu = GameCommunicator(room.room_id, strg)
-                        commu.start()
+                    # room = hall.get_user_with_uid(self.current_user).game_room
+                    # if str(room.room_id).startswith('ai_') and room.get_status() == GameRoom.ROOM_STATUS_WAITJOIN:
+                    #     strg = GameStrategy()
+                    #     commu = GameCommunicator(room.room_id, strg)
+                    #     commu.start()
 
                 else:
                     action_result["id"] = -1
@@ -95,6 +95,9 @@ class ActionHandler(BaseHandler):
                 else:
                     action_result["id"] = -1
                     action_result["info"] = "Not in room, please join one."
+            elif action == "get_all_rooms":
+                action_result["id"] = 0
+                action_result["info"]=[[room_name,hall.id2room[room_name].get_status()] for room_name in hall.id2room]
             else:
                 action_result["id"] = -1
                 action_result["info"] = "Not recognition action" + action
