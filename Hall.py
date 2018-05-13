@@ -4,6 +4,7 @@ from ChessBoard import ChessBoard
 import cPickle as pickle
 import random
 import string
+import os
 
 
 class User(object):
@@ -53,7 +54,13 @@ class User(object):
     def leave_room(self):
         if self.game_room is None:
             return -1
+        self.leave_game()
         self.game_room.leave_room(self)
+
+    def leave_game(self):
+        if self.game_room is None:
+            return -1
+        self.game_room.leave_game(self)
         self.game_status = User.USER_GAME_STATUS_NOJOIN
         self.game_role = -1
 
@@ -78,7 +85,7 @@ class GameRoom(object):
         self.board = ChessBoard()
         self.status_signature = None
         self.set_changed()
-
+        self.chess_folder = 'chess_output'
         # self.game_status = GameRoom.GAME_STATUS_NOTBEGIN
         self.ask_take_back = 0
 
@@ -128,6 +135,8 @@ class GameRoom(object):
             if piece_i and piece_j:
                 return_code = self.board.put_piece(int(piece_i), int(piece_j), user.game_role)
                 if return_code >= 0:
+                    if return_code == 1:
+                        self.finish_game()
                     self.set_changed()
                     return ActionResult(0, "put_piece success:" + str(return_code));
                 else:
@@ -211,19 +220,22 @@ class GameRoom(object):
         self.set_changed()
         return GameRoom.ACTION_SUCCESS
 
-    def leave_room(self, user):
-        if user not in self.users:
-            # not in room
+    def leave_game(self, user):
+        if user not in self.play_users:
             return
 
         if user in self.play_users:
             if self.get_status() == GameRoom.ROOM_STATUS_PLAYING:
-                self.board.state = ChessBoard.STATE_DONE
-
+                self.finish_game(state=-1)
             self.play_users.remove(user)
             if user.game_role in self.position2users:
                 del self.position2users[user.game_role]
+        self.set_changed()
 
+    def leave_room(self, user):
+        if user not in self.users:
+            return
+        self.leave_game(user)
         self.users.remove(user)
         self.set_changed()
 
@@ -244,6 +256,23 @@ class GameRoom(object):
         if len(self.play_users) == 2:
             return GameRoom.ROOM_STATUS_PLAYING;
         return GameRoom.ROOM_STATUS_WRONG;
+
+    def reset_game(self):
+        while len(self.play_users) > 0:
+            self.play_users[0].leave_game()
+        self.board.reset()
+
+    def finish_game(self, state=0):
+        if state == -1:
+            self.board.abort()
+
+        if not os.path.exists(self.chess_folder):
+            os.makedirs(self.chess_folder)
+        import datetime
+        tm = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        chess_file = self.chess_folder + '/' + self.room_id + '_' + tm + '.txt'
+        with open(chess_file, 'w') as f:
+            f.write(self.board.dumps())
 
     # def get_room_info(self):
     #     room_info = {'status': 0, 'roomid': -1}

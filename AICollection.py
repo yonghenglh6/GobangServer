@@ -100,7 +100,7 @@ class GameCommunicator(threading.Thread):
             room = client.get_room_info()
             user = client.get_user_info()
             gameboard = client.get_game_info()
-            # print 'waittime:',wait_time,',room_status:',room.get_status(),',ask_take_back:',room.ask_take_back
+            print 'waittime:',wait_time,',room_status:',room.get_status(),',ask_take_back:',room.ask_take_back
             if room.get_status() == 1 or room.get_status() == 2:
                 continue
             elif room.get_status() == 3:
@@ -110,6 +110,7 @@ class GameCommunicator(threading.Thread):
                 if gameboard.get_current_user() == user.game_role:
                     one_legal_piece = self.stragegy.play_one_piece(user, gameboard)
                     action_result = client.put_piece(*one_legal_piece)
+                    client.wait_game_info_changed(interval=exp_interval, max_time=single_max_time)
                     if action_result['id'] != 0:
                         print ChessHelper.numToAlp(one_legal_piece[0]), ChessHelper.numToAlp(one_legal_piece[1])
                         print action_result['info']
@@ -152,7 +153,7 @@ def go_listen():
     parser.add_argument('--server_url', default='http://192.168.7.61:11111')
     args = parser.parse_args()
 
-    args.server_url = ''
+
     if args.server_url.endswith('/'):
         args.server_url = args.server_url[:-1]
     if not args.server_url.startswith('http://'):

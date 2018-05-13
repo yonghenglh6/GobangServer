@@ -1,3 +1,4 @@
 *.pyc
 .idea
-yixin_comm/
+yixin_comm
+chess_output

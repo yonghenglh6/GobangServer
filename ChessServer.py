@@ -84,6 +84,18 @@ class ActionHandler(BaseHandler):
                 action_result["id"] = 0
                 action_result["info"] = [[room_name, hall.id2room[room_name].get_status()] for room_name in
                                          hall.id2room]
+            elif action == "reset_room":
+                user = hall.get_user_with_uid(self.current_user)
+                room = user.game_room
+                # room=GameRoom()
+                if room and room.get_status() == GameRoom.ROOM_STATUS_FINISH and user in room.play_users:
+                    room.reset_game()
+                    action_result["id"] = 0
+                    action_result["info"] = "reset success"
+                else:
+                    action_result["id"] = -1
+                    action_result["info"] = "reset failed."
+
             else:
                 action_result["id"] = -1
                 action_result["info"] = "Not recognition action" + action

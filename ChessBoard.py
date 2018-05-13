@@ -15,6 +15,7 @@ class ChessBoard(object):
 
     STATE_RUNNING = 0
     STATE_DONE = 1
+    STATE_ABORT = 1
 
     PIECE_STATE_BLANK = 0
     PIECE_STATE_FIRST = 1
@@ -35,12 +36,22 @@ class ChessBoard(object):
 
         self.dump_cache = None
 
+    def changed(func):
+        def wrapper_func(self,*args, **kwargs):
+            ret=func(self,*args, **kwargs)
+            self.dump_cache = None
+            return ret
+
+        return wrapper_func
+
     def get_piece(self, row, col):
         return self.board[row + ChessBoard.PAD, col + ChessBoard.PAD]
 
+    @changed
     def set_piece(self, row, col, user):
         self.board[row + ChessBoard.PAD, col + ChessBoard.PAD] = user
 
+    @changed
     def put_piece(self, row, col, user):
         """Put a piece in the board and check if he wins.
         Returns:
@@ -59,7 +70,7 @@ class ChessBoard(object):
             return -3
         if user != self.current_user:
             return -4
-        self.dump_cache = None
+
         self.set_piece(row, col, user)
         self.move_num += 1
         self.move_history.append((user, self.move_num, row, col,))
@@ -100,7 +111,8 @@ class ChessBoard(object):
             self.current_user = ChessBoard.PIECE_STATE_SECOND
 
         if self.move_num == self.SIZE * self.SIZE:
-            self.state = ChessBoard.STATE_DONE
+            # self.state = ChessBoard.STATE_DONE
+            self.state = ChessBoard.STATE_ABORT
 
         return 0
 
@@ -116,6 +128,7 @@ class ChessBoard(object):
     def get_lastmove(self):
         return self.move_history[-1] if len(self.move_history) > 0 else (-1, -1, -1, -1)
 
+    @changed
     def take_one_back(self):
         if len(self.move_history) > 0:
             last_move = self.move_history.pop()
@@ -126,15 +139,28 @@ class ChessBoard(object):
                 self.current_user = ChessBoard.PIECE_STATE_FIRST
             else:
                 self.current_user = ChessBoard.PIECE_STATE_SECOND
-            self.dump_cache = None
 
     def is_over(self):
-        return self.state == ChessBoard.STATE_DONE
+        return self.state == ChessBoard.STATE_DONE or self.state == ChessBoard.STATE_ABORT
 
     def dumps(self):
         if self.dump_cache is None:
             self.dump_cache = pickle.dumps((self.SIZE, self.board, self.state, self.current_user, self.move_history))
         return self.dump_cache
 
+    @changed
     def loads(self, chess_str):
         self.SIZE, self.board, self.state, self.current_user, self.move_history = pickle.loads(chess_str)
+
+
+    @changed
+    def reset(self):
+        self.board = np.zeros((self.SIZE + ChessBoard.PAD * 2, self.SIZE + ChessBoard.PAD * 2), dtype=np.uint8)
+        self.state = ChessBoard.STATE_RUNNING
+        self.current_user = ChessBoard.PIECE_STATE_FIRST
+        self.move_num = 0
+        self.move_history = []
+
+    @changed
+    def abort(self):
+        self.state = ChessBoard.STATE_ABORT

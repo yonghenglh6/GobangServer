@@ -27,6 +27,9 @@
         var GLOBAL_current_role={{chess_board.get_current_user()}}; //current_role 当前行动角色 0黑方 1白方
         var GLOBAL_ask_take_back={{room.ask_take_back}};
 
+
+
+
     </script>
     <div>
         你已经进入 {{room.room_id}} 房间,本房间共有{{len(room.users)}}位用户：
@@ -85,11 +88,18 @@
                 }
 
 
+
+
+
             </style>
             <div>
                 功能:
-                {% if room.ask_take_back==0 and (user.game_role==1 or user.game_role==2) %}
+                {% if room.get_status()==GameRoom.ROOM_STATUS_PLAYING and room.ask_take_back==0 and (user.game_role==1 or user.game_role==2) %}
                 <button class="ask_take_back_button">申请悔棋</button>
+                {% end %}
+
+                {% if room.get_status()==GameRoom.ROOM_STATUS_FINISH and (user.game_role==1 or user.game_role==2) %}
+                <button class="reset_room_button">重新开始</button>
                 {% end %}
 
 
@@ -102,18 +112,17 @@
                 等待选手加入游戏.
                 {% elif room.get_status()==GameRoom.ROOM_STATUS_PLAYING %}
 
-                    {% if chess_board.get_current_user()==user.game_role %}
-                    <span class="game_status_banner game_status_banner_yourturn">当前轮到你行动</span>
-                    {% elif user.game_role<=0 %}
-                    当前轮到{{current_name}}行动
-                    {% else %}
-                    请等待对方下子
-                    {% end %}
+                {% if chess_board.get_current_user()==user.game_role %}
+                <span class="game_status_banner game_status_banner_yourturn">当前轮到你行动</span>
+                {% elif user.game_role<=0 %}
+                当前轮到{{current_name}}行动
+                {% else %}
+                请等待对方下子
+                {% end %}
 
                 {% elif room.get_status()==GameRoom.ROOM_STATUS_FINISH %}
                 游戏结束，{{winner_name}}获胜。
                 {% end %}
-
 
 
             </div>
@@ -152,6 +161,18 @@
     </div>
 
     <script type="text/javascript">
+
+        function send_post_and_redirect(url,data){
+            $.post(url,data,function(data,status){
+            var jsondata=eval(data);
+            if(jsondata["id"]==0){
+                $(location).attr('href', '/');
+            }else{
+                alert(jsondata["info"]);
+            }
+            });
+        }
+
             $(document).ready(function(){
                   function check_last_move(){
 
@@ -229,56 +250,36 @@
                 });
                   $(".join_game_button").click(function(){
                     var join_game_position=$(this).attr("position");
-                    $.post("/action?action=joingame",
-                    {
-                        position:join_game_position,
-                        },function(data,status){
-                    var jsondata=eval(data);
-                    if(jsondata["id"]==0){
-                        $(location).attr('href', '/');
-                    }else{
-                        alert(jsondata["info"]);
-                    }
-                    });
+                    send_post_and_redirect("/action?action=joingame",{position:join_game_position,});
                   });
 
                   $(".ask_take_back_button").click(function(){
-                    $.post("/action?action=gameaction",
-                    {
-                        actionid: "ask_take_back",
-                        },function(data,status){
-                    var jsondata=eval(data);
-                    if(jsondata["id"]==0){
-                        $(location).attr('href', '/');
-                    }else{
-                        alert(jsondata["info"]);
-                    }
-                    });
+                    send_post_and_redirect("/action?action=gameaction",{actionid: "ask_take_back",});
                   });
 
 
                   if((GLOBAL_ask_take_back==1 && GLOBAL_user_role==2)||(GLOBAL_ask_take_back==2 && GLOBAL_user_role==1)){
                        var agreed=false;
-                       if(confirm("对方要求悔棋，是否同意？")){
+                       if(confirm("对方要求悔棋，是否同意？"))
                             agreed=true;
-                       }else{
+                       else
                             agreed=false;
-                       }
-                        $.post("/action?action=gameaction",
+
+                       send_post_and_redirect("/action?action=gameaction",
                         {
                             actionid: "answer_take_back",
                             agree: agreed,
-                            },function(data,status){
-                        var jsondata=eval(data);
-                        if(jsondata["id"]==0){
-                            $(location).attr('href', '/');
-                        }else{
-                            alert(jsondata["info"]);
-                        }
-                        });
+                       });
+
                   }
 
+                  $(".reset_room_button").click(function(){
+                    send_post_and_redirect("/action?action=reset_room",{});
+                  });
             });
+
+
+
 
     </script>
 
@@ -311,6 +312,9 @@ $(document).ready(function(){
 
 
 });
+
+
+
 
 
 
