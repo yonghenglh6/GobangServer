@@ -10,23 +10,19 @@ from ChessBoard import ChessBoard
 from Hall import GameRoom
 from Hall import User
 import random
-import os
-
-GAME_URL = 'http://192.168.7.61:11111'
-
 
 class ChessClient():
-    def __init__(self):
+    def __init__(self, server_url):
         self.session = requests.Session()
         self.session.cookies = cookielib.CookieJar()
         agent = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Maxthon/5.1.2.3000 Chrome/55.0.2883.75 Safari/537.36'
         self.headers = {
-            "Host": "http://192.168.7.61:11111",
-            "Origin": "http://192.168.7.61:11111",
-            "Referer": "http://192.168.7.61:11111",
+            "Host": server_url,
+            "Origin": server_url,
+            "Referer": server_url,
             'User-Agent': agent
         }
-
+        self.server_url = server_url
         self.board = ChessBoard()
         self.last_move = {
             'role': -100,
@@ -36,10 +32,10 @@ class ChessClient():
         }
 
     def send_get(self, url):
-        return self.session.get(GAME_URL + url, headers=self.headers)
+        return self.session.get(self.server_url + url, headers=self.headers)
 
     def send_post(self, url, data):
-        return self.session.post(GAME_URL + url, data, headers=self.headers)
+        return self.session.post(self.server_url + url, data, headers=self.headers)
 
     def login_in_guest(self):
         response = self.send_get('/login?action=login_in_guest')
@@ -153,15 +149,13 @@ def go_play():
     parser.add_argument('--server_url', default='http://192.168.7.61:11111')
     parser.add_argument('--ai', default='random')
     args = parser.parse_args()
-    global GAME_URL
-    GAME_URL = args.server_url
 
     if args.ai == 'random':
         strategy = GameStrategy_random()
     else:
         assert False, "No other ai, you can add one or import the AICollection's ai."
 
-    client = ChessClient()
+    client = ChessClient(args.server_url)
     client.login_in_guest()
     client.join_room(args.room_name)
     client.join_game()

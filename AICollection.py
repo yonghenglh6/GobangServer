@@ -7,30 +7,10 @@ from Hall import GameRoom
 from Hall import User
 import random
 import os
-import ChessClient
-
-class GameListener():
-    def __init__(self, prefix_stategy_map):
-        self.client = ChessClient()
-        self.client.login_in_guest()
-        self.prefix_stategy_map = prefix_stategy_map
-
-    def listen(self):
-        while True:
-            all_rooms = self.client.get_all_rooms()
-            for room in all_rooms:
-                room_name = room[0]
-                room_status = room[1]
-                for prefix in self.prefix_stategy_map:
-                    if room_name.startswith(prefix) and room_status == GameRoom.ROOM_STATUS_ONEWAITING:
-                        strg = self.prefix_stategy_map[prefix]()
-                        commu = GameCommunicator(room_name, strg)
-                        commu.start()
-                        break
-            time.sleep(4)
+from ChessClient import ChessClient
 
 
-class GameStrategy():
+class GameStrategy(object):
     def __init__(self):
         import gobang
         self.searcher = gobang.searcher()
@@ -48,7 +28,7 @@ class GameStrategy():
         return (row, col)
 
 
-class GameStrategy_yixin():
+class GameStrategy_yixin(object):
 
     def __init__(self):
         self.muid = str(random.randint(0, 1000000))
@@ -66,7 +46,7 @@ class GameStrategy_yixin():
                 chess_state_file.write('%d,%d\n' % (row, col))
         if os.path.exists(self.action_file):
             os.remove(self.action_file)
-        os.system("yixin.exe %s %s" % (self.chess_state_file, self.action_file))
+        os.system("yixin_ai/yixin.exe %s %s" % (self.chess_state_file, self.action_file))
         row, col = random.randint(0, 15), random.randint(0, 15)
         with open(self.action_file) as action_file:
             line = action_file.readline()
@@ -76,7 +56,7 @@ class GameStrategy_yixin():
         return (row, col)
 
 
-class GameStrategy_random():
+class GameStrategy_random(object):
     def __init__(self):
         self._chess_helper_move_set = []
         for i in range(15):
@@ -95,13 +75,14 @@ class GameStrategy_random():
 
 
 class GameCommunicator(threading.Thread):
-    def __init__(self, roomid, stragegy):
+    def __init__(self, roomid, stragegy, server_url):
         threading.Thread.__init__(self)
         self.room_id = roomid
         self.stragegy = stragegy;
+        self.server_url = server_url
 
     def run(self):
-        client = ChessClient()
+        client = ChessClient(self.server_url)
         client.login_in_guest()
         client.join_room(self.room_id)
         client.join_game()
@@ -124,18 +105,40 @@ class GameCommunicator(threading.Thread):
             elif room.get_status() == 4:
                 break
 
+
+class GameListener(object):
+    def __init__(self, prefix_stategy_map, server_url):
+        self.client = ChessClient()
+        self.client.login_in_guest()
+        self.prefix_stategy_map = prefix_stategy_map
+        self.server_url = server_url
+
+    def listen(self):
+        while True:
+            all_rooms = self.client.get_all_rooms()
+            for room in all_rooms:
+                room_name = room[0]
+                room_status = room[1]
+                for prefix in self.prefix_stategy_map:
+                    if room_name.startswith(prefix) and room_status == GameRoom.ROOM_STATUS_ONEWAITING:
+                        strg = self.prefix_stategy_map[prefix]()
+                        commu = GameCommunicator(room_name, strg, self.server_url)
+                        commu.start()
+                        break
+            time.sleep(4)
+
+
 def go_listen():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--server_url', default='http://192.168.7.61:11111')
     args = parser.parse_args()
-    global GAME_URL
-    GAME_URL = args.server_url
 
     prefix_stategy_map = {'ai_': lambda: GameStrategy(), 'yixin_': lambda: GameStrategy_yixin(),
                           'random_': lambda: GameStrategy_random()}
-    listen = GameListener(prefix_stategy_map)
+    listen = GameListener(prefix_stategy_map, args.server_url)
     listen.listen()
+
 
 if __name__ == "__main__":
     go_listen()

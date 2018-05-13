@@ -2,7 +2,6 @@ import tornado.ioloop
 import tornado.web
 import os
 
-from ChessClient import GameStrategy, GameCommunicator
 from Hall import Hall
 from Hall import GameRoom
 from Hall import User
