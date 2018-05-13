@@ -46,7 +46,7 @@ class GameStrategy_yixin(object):
                 chess_state_file.write('%d,%d\n' % (row, col))
         if os.path.exists(self.action_file):
             os.remove(self.action_file)
-        os.system("yixin_ai/yixin.exe %s %s" % (self.chess_state_file, self.action_file))
+        os.system("yixin_ai\yixin.exe %s %s" % (self.chess_state_file, self.action_file))
         row, col = random.randint(0, 15), random.randint(0, 15)
         with open(self.action_file) as action_file:
             line = action_file.readline()
@@ -91,7 +91,7 @@ class GameCommunicator(threading.Thread):
             room = client.get_room_info()
             user = client.get_user_info()
             gameboard = client.get_game_info()
-            print 'waittime:',wait_time,',room_status:',room.get_status(),',ask_take_back:',room.ask_take_back
+            # print 'waittime:',wait_time,',room_status:',room.get_status(),',ask_take_back:',room.ask_take_back
             if room.get_status() == 1 or room.get_status() == 2:
                 continue
             elif room.get_status() == 3:
@@ -125,7 +125,7 @@ class GameListener(object):
                 room_status = room[1]
                 for prefix in self.prefix_stategy_map:
                     if room_name.startswith(prefix) and room_status == GameRoom.ROOM_STATUS_ONEWAITING:
-                        print 'Evoke:',room_name
+                        print 'Evoke:', room_name
                         strg = self.prefix_stategy_map[prefix]()
                         commu = GameCommunicator(room_name, strg, self.server_url)
                         commu.start()
@@ -138,6 +138,12 @@ def go_listen():
     parser = argparse.ArgumentParser()
     parser.add_argument('--server_url', default='http://192.168.7.61:11111')
     args = parser.parse_args()
+
+    args.server_url = ''
+    if args.server_url.endswith('/'):
+        args.server_url = args.server_url[:-1]
+    if not args.server_url.startswith('http://'):
+        args.server_url = 'http://' + args.server_url
 
     prefix_stategy_map = {'ai_': lambda: GameStrategy(), 'yixin_': lambda: GameStrategy_yixin(),
                           'random_': lambda: GameStrategy_random()}
