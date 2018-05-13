@@ -24,7 +24,7 @@ class GameStrategy(object):
         # gameboard=ChessBoard()
         # gameboard.move_history
         score, row, col = self.searcher.search(turn, 2)
-        print "score:", score
+        # print "score:", score
         return (row, col)
 
 
@@ -91,9 +91,13 @@ class GameCommunicator(threading.Thread):
             room = client.get_room_info()
             user = client.get_user_info()
             gameboard = client.get_game_info()
+            print 'waittime:',wait_time,',room_status:',room.get_status(),',ask_take_back:',room.ask_take_back
             if room.get_status() == 1 or room.get_status() == 2:
                 continue
             elif room.get_status() == 3:
+                if room.ask_take_back != 0 and room.ask_take_back != user.game_role:
+                    client.answer_take_back()
+                    continue
                 if gameboard.get_current_user() == user.game_role:
                     one_legal_piece = self.stragegy.play_one_piece(user, gameboard)
                     action_result = client.put_piece(*one_legal_piece)
@@ -108,7 +112,7 @@ class GameCommunicator(threading.Thread):
 
 class GameListener(object):
     def __init__(self, prefix_stategy_map, server_url):
-        self.client = ChessClient()
+        self.client = ChessClient(server_url)
         self.client.login_in_guest()
         self.prefix_stategy_map = prefix_stategy_map
         self.server_url = server_url
@@ -121,6 +125,7 @@ class GameListener(object):
                 room_status = room[1]
                 for prefix in self.prefix_stategy_map:
                     if room_name.startswith(prefix) and room_status == GameRoom.ROOM_STATUS_ONEWAITING:
+                        print 'Evoke:',room_name
                         strg = self.prefix_stategy_map[prefix]()
                         commu = GameCommunicator(room_name, strg, self.server_url)
                         commu.start()

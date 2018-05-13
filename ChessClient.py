@@ -11,6 +11,7 @@ from Hall import GameRoom
 from Hall import User
 import random
 
+
 class ChessClient():
     def __init__(self, server_url):
         self.session = requests.Session()
@@ -24,12 +25,7 @@ class ChessClient():
         }
         self.server_url = server_url
         self.board = ChessBoard()
-        self.last_move = {
-            'role': -100,
-            'move_num': -1,
-            'row': -1,
-            'col': -1,
-        }
+        self.last_status_signature = ""
 
     def send_get(self, url):
         return self.session.get(self.server_url + url, headers=self.headers)
@@ -97,17 +93,20 @@ class ChessClient():
         room = pickle.loads(str(action_result['info']))
         return room
 
-    def wait_game_info_changed(self, interval=0.3, max_time=100):
+    def wait_game_info_changed(self, interval=0.5, max_time=100):
         wait_time = 0
         assert interval > 0, "interval must be positive"
         while True:
             response = self.send_get(
-                '/action?action=gameaction&actionid=%s' % ('getlastmove'))
+                '/action?action=gameaction&actionid=%s' % ('get_status_signature'))
             action_result = json.loads(response.content)
-            c_last_move = action_result['info']
-            if c_last_move['role'] != self.last_move['role'] or c_last_move['move_num'] != self.last_move['move_num'] or \
-                    c_last_move['row'] != self.last_move['row'] or c_last_move['col'] != self.last_move['col']:
-                self.last_move = c_last_move
+            if action_result['id'] == 0:
+                status_signature = action_result['info']
+                if self.last_status_signature != status_signature:
+                    self.last_status_signature = status_signature
+                    break
+            else:
+                print "ERROR get_status_signature,", action_result['id'], action_result['info']
                 break
             time.sleep(interval)
             wait_time += interval
@@ -122,6 +121,12 @@ class ChessClient():
         action_result = json.loads(response.content)
         all_rooms = action_result['info']
         return all_rooms
+
+    def answer_take_back(self, agree=True):
+        response = self.send_get(
+            '/action?action=gameaction&actionid=answer_take_back&agree=' + ('true' if agree else 'false'))
+        action_result = json.loads(response.content)
+        return action_result
 
 
 class GameStrategy_random():
@@ -145,7 +150,7 @@ class GameStrategy_random():
 def go_play():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--room_name', type=str, default='random')
+    parser.add_argument('--room_name', type=str, default='test_room')
     parser.add_argument('--server_url', default='http://192.168.7.61:11111')
     parser.add_argument('--ai', default='random')
     args = parser.parse_args()
@@ -181,6 +186,9 @@ def go_play():
             print "等待另一个对手加入游戏:"
             continue
         elif room.get_status() == GameRoom.ROOM_STATUS_PLAYING:
+            if room.ask_take_back != 0 and room.ask_take_back != user.game_role:
+                client.answer_take_back()
+                break
             if gameboard.get_current_user() == user.game_role:
                 print "轮到你走："
                 one_legal_piece = strategy.play_one_piece(user, gameboard)

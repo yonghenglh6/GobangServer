@@ -2,6 +2,8 @@ import sys
 
 from ChessBoard import ChessBoard
 import cPickle as pickle
+import random
+import string
 
 
 class User(object):
@@ -9,8 +11,11 @@ class User(object):
         self.uid = uid_
         self.game_room = None
         self.hall = hall_
-        self.game_status = 0
+        self.game_status = User.USER_GAME_STATUS_NOJOIN
         self.game_role = -1
+
+    USER_GAME_STATUS_NOJOIN = 0
+    USER_GAME_STATUS_GAMEJOINED = 1
 
     def send_message(self):
         pass
@@ -26,24 +31,31 @@ class User(object):
 
     def join_room(self, room):
         if self.game_room is not None:
-            self.game_room.leave_room(self)
-            self.game_status = 0
-            self.game_role = -1
+            self.leave_room()
+
         if room.join_room(self) == GameRoom.ACTION_SUCCESS:
             self.game_room = room
         else:
             return -1
 
-    def join_game(self):
+    def join_game(self, user_role):
         if self.game_room is None:
             return -1
-        if self.game_status == 1:
+
+        if self.game_status == User.USER_GAME_STATUS_GAMEJOINED:
             return -1
-        if self.game_room.join_game(self) == GameRoom.ACTION_SUCCESS:
-            self.game_status = 1
+        if self.game_room.join_game(self, user_role) == GameRoom.ACTION_SUCCESS:
+            self.game_status = User.USER_GAME_STATUS_GAMEJOINED
             return 0
         else:
             return -1
+
+    def leave_room(self):
+        if self.game_room is None:
+            return -1
+        self.game_room.leave_room(self)
+        self.game_status = User.USER_GAME_STATUS_NOJOIN
+        self.game_role = -1
 
 
 class ActionResult(object):
@@ -58,17 +70,27 @@ class GameRoom(object):
 
     def __init__(self, room_id_):
         self.play_users = []
+        self.position2users = {}  # 1 black role   2 white role
         self.room_id = room_id_
         self.users = []
         self.max_player_num = 2
         self.max_user_num = 10000
         self.board = ChessBoard()
-        self.last_status = 0;
+        self.status_signature = None
+        self.set_changed()
+
+        # self.game_status = GameRoom.GAME_STATUS_NOTBEGIN
+        self.ask_take_back = 0
+
+    def set_changed(self):
+        self.status_signature = ''.join(random.sample(string.ascii_letters + string.digits, 8))
 
     def broadcast_message_to_all(self, message):
+        self.set_changed()
         pass
 
     def send_message(self, to_user_id, message):
+        self.set_changed()
         pass
 
     def get_last_move(self):
@@ -83,25 +105,30 @@ class GameRoom(object):
         }
         return last_move
 
-    def get_last_info(self):
-        (userrole, move_num, row, col) = self.board.get_lastmove()
-        if userrole < 0:
-            userrole = -1 * self.get_status() - 1
-        last_move = {
-            'role': userrole,
-            'move_num': move_num,
-            'row': row,
-            'col': col,
-        }
-        return last_move
+    # GAME_STATUS_NOTBEGIN = 0
+    # GAME_STATUS_RUNING_HEIFANG = 1
+    # GAME_STATUS_RUNING_BAIFANG = 2
+    # GAME_STATUS_FINISH = 3
+    # GAME_STATUS_ASKTAKEBACK_HEIFANG = 4
+    # GAME_STATUS_ASKTAKEBACK_BAIFANG = 5
+    # GAME_STATUS_ASKREBEGIN_HEIFANG = 6
+    # GAME_STATUS_ASKREBEGIN_BAIFANG = 7
+
+    def get_signature(self):
+        return self.status_signature
 
     def action(self, user, action_code, action_args):
         if action_code == "put_piece":
+            if self.ask_take_back != 0:
+                return ActionResult(-1, "Wait take back answer before.")
+            if not (user.game_role == 1) and not (user.game_role == 2):
+                return ActionResult(-1, "Not the right time or role to put piece")
             piece_i = action_args.get_argument('piece_i', None)
             piece_j = action_args.get_argument('piece_j', None)
             if piece_i and piece_j:
                 return_code = self.board.put_piece(int(piece_i), int(piece_j), user.game_role)
                 if return_code >= 0:
+                    self.set_changed()
                     return ActionResult(0, "put_piece success:" + str(return_code));
                 else:
                     return ActionResult(-4, "put_piece failed, because " + str(return_code))
@@ -109,14 +136,42 @@ class GameRoom(object):
                 return ActionResult(-3, "Not set the piece_i and piece_j")
         elif action_code == "getlastmove":
             return ActionResult(0, self.get_last_move())
-        elif action_code == "get_last_info":
-            return ActionResult(0, self.get_last_info())
+        elif action_code == "get_status_signature":
+            return ActionResult(0, self.get_signature())
         elif action_code == "get_room_info":
             return ActionResult(0, pickle.dumps(self))
         elif action_code == "get_game_info":
             return ActionResult(0, pickle.dumps(self.board))
         elif action_code == "get_user_info":
             return ActionResult(0, pickle.dumps(user))
+        elif action_code == "ask_take_back":
+            if self.ask_take_back != 0:
+                return ActionResult(-1, "Not right time to ask take back.")
+            if user.game_role != 1 and user.game_role != 2:
+                return ActionResult(-1, "Not right role to ask take back.")
+            self.ask_take_back = user.game_role
+            self.set_changed()
+            return ActionResult(0, "Ask take back success")
+        elif action_code == "answer_take_back":
+
+            if not (self.ask_take_back == 1 and user.game_role == 2) and not (
+                    self.ask_take_back == 2 and user.game_role == 1):
+                return ActionResult(-1, "Not the right time or role to answer take back")
+
+            agree = action_args.get_argument('agree', 'false')
+            if agree == 'true':
+                if self.ask_take_back == 1 and user.game_role == 2:
+                    if self.board.get_current_user() == 1:
+                        self.board.take_one_back()
+                    self.board.take_one_back()
+
+                elif self.ask_take_back == 2 and user.game_role == 1:
+                    if self.board.get_current_user() == 2:
+                        self.board.take_one_back()
+                    self.board.take_one_back()
+            self.ask_take_back = 0
+            self.set_changed()
+            return ActionResult(0, "answer take back success")
         else:
             return ActionResult(-2, "Not recognized game action")
 
@@ -125,36 +180,56 @@ class GameRoom(object):
     #         return GameRoom.ACTION_SUCCESS
     #     return self.join_watch(user)
 
-    def join_game(self, user):
+    def join_game(self, user, user_role):
         if user not in self.users:
             return GameRoom.ACTION_FAILURE
+
         if len(self.play_users) >= self.max_player_num:
             return GameRoom.ACTION_FAILURE
+        idle_position = [i for i in range(1, self.max_player_num + 1) if i not in self.position2users]
+        if len(idle_position) == 0:
+            return GameRoom.ACTION_FAILURE
+        if user_role is None or user_role == -1:
+            user_role = idle_position[0]
+        elif user_role == 0:
+            random.shuffle(idle_position)
+            user_role = idle_position[0]
+        else:
+            if user_role in self.position2users or user_role > self.max_player_num:
+                return GameRoom.ACTION_FAILURE
+        user.game_role = user_role
+        self.position2users[user_role] = user
         self.play_users.append(user)
-        user.game_role = len(self.play_users)
+
+        self.set_changed()
         return GameRoom.ACTION_SUCCESS
 
     def join_room(self, user):
         if len(self.users) >= self.max_user_num:
             return GameRoom.ACTION_FAILURE
         self.users.append(user)
+        self.set_changed()
         return GameRoom.ACTION_SUCCESS
 
     def leave_room(self, user):
+        if user not in self.users:
+            # not in room
+            return
+
         if user in self.play_users:
             self.play_users.remove(user)
+            if user.game_role in self.position2users:
+                del self.position2users[user.game_role]
 
-        if user in self.users:
-            self.users.remove(user)
-        else:
-            # not in room
-            assert False, ""
+        self.users.remove(user)
+        self.set_changed()
 
     ROOM_STATUS_FINISH = 4
     ROOM_STATUS_NOONE = 1
     ROOM_STATUS_ONEWAITING = 2
     ROOM_STATUS_PLAYING = 3
     ROOM_STATUS_WRONG = -1
+    ROOM_STATUS_NOTINROOM = 0
 
     def get_status(self):
         if self.board.is_over():
@@ -248,9 +323,9 @@ class Hall(object):
             return user.game_room
         return None
 
-    def join_game(self, username):
+    def join_game(self, username, user_role):
         user = self.get_user_with_uid(username)
-        return user.join_game()
+        return user.join_game(user_role)
 
     def game_action(self, username, actionid, arg_pack):
         user = self.get_user_with_uid(username)

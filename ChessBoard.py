@@ -62,7 +62,7 @@ class ChessBoard(object):
         self.dump_cache = None
         self.set_piece(row, col, user)
         self.move_num += 1
-        self.move_history.append((user,self.move_num,row, col,))
+        self.move_history.append((user, self.move_num, row, col,))
         # self.last_move = (row, col)
 
         # check if win
@@ -114,7 +114,19 @@ class ChessBoard(object):
         return self.current_user
 
     def get_lastmove(self):
-        return self.move_history[-1] if len(self.move_history) > 0 else (-1,-1,-1, -1)
+        return self.move_history[-1] if len(self.move_history) > 0 else (-1, -1, -1, -1)
+
+    def take_one_back(self):
+        if len(self.move_history) > 0:
+            last_move = self.move_history.pop()
+            self.set_piece(last_move[-2], last_move[-1], ChessBoard.PIECE_STATE_BLANK)
+            self.move_num -= 1
+
+            if self.current_user == ChessBoard.PIECE_STATE_SECOND:
+                self.current_user = ChessBoard.PIECE_STATE_FIRST
+            else:
+                self.current_user = ChessBoard.PIECE_STATE_SECOND
+            self.dump_cache = None
 
     def is_over(self):
         return self.state == ChessBoard.STATE_DONE

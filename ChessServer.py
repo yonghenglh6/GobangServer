@@ -19,21 +19,10 @@ class ChessHandler(BaseHandler):
     def get_post(self):
         info_ = ""
         user = hall.get_user_with_uid(self.current_user)
-        room_info = hall.get_room_info_with_user(self.current_user)
-        chess_board = None
-        last_move = None
-        room_status = 0
-        import ChessHelper
-        if room_info['status'] > 0:
-            # ChessHelper.playRandomGame(room_info['room'].board)\
-            room = room_info['room']
-            chess_board = room.board
-            last_move = room.get_last_move()
-            # chess_board = ChessHelper.printBoard2Str(room_info['room'].board)
-
-        # print room_info
-        self.render("page/chessboard.html", username=self.current_user, roominfo=room_info, info=info_,
-                    chess_board=chess_board, user=user, last_move=last_move)
+        room = user.game_room
+        chess_board = room.board if room else None
+        self.render("page/chessboard.html", username=self.current_user, room=room,
+                    chess_board=chess_board, user=user)
 
     @tornado.web.authenticated
     def get(self):
@@ -62,14 +51,11 @@ class ActionHandler(BaseHandler):
                     action_result["info"] = "Not legal room id."
 
             elif action == "joingame":
-                if hall.join_game(self.current_user) == 0:
+                user_role = int(self.get_argument("position", -1))
+
+                if hall.join_game(self.current_user, user_role) == 0:
                     action_result["id"] = 0
                     action_result["info"] = "Join game success."
-                    # room = hall.get_user_with_uid(self.current_user).game_room
-                    # if str(room.room_id).startswith('ai_') and room.get_status() == GameRoom.ROOM_STATUS_WAITJOIN:
-                    #     strg = GameStrategy()
-                    #     commu = GameCommunicator(room.room_id, strg)
-                    #     commu.start()
 
                 else:
                     action_result["id"] = -1
@@ -96,7 +82,8 @@ class ActionHandler(BaseHandler):
                     action_result["info"] = "Not in room, please join one."
             elif action == "get_all_rooms":
                 action_result["id"] = 0
-                action_result["info"]=[[room_name,hall.id2room[room_name].get_status()] for room_name in hall.id2room]
+                action_result["info"] = [[room_name, hall.id2room[room_name].get_status()] for room_name in
+                                         hall.id2room]
             else:
                 action_result["id"] = -1
                 action_result["info"] = "Not recognition action" + action
@@ -157,7 +144,6 @@ class LoginHandler(BaseHandler):
 
     def post(self):
         self.get_post()
-
 
 
 def main():
