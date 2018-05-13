@@ -217,6 +217,9 @@ class GameRoom(object):
             return
 
         if user in self.play_users:
+            if self.get_status() == GameRoom.ROOM_STATUS_PLAYING:
+                self.board.state = ChessBoard.STATE_DONE
+
             self.play_users.remove(user)
             if user.game_role in self.position2users:
                 del self.position2users[user.game_role]

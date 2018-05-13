@@ -86,8 +86,17 @@ class GameCommunicator(threading.Thread):
         client.login_in_guest()
         client.join_room(self.room_id)
         client.join_game()
+        exp_interval = 0.5
+        max_exp_interval = 200
         while True:
-            wait_time = client.wait_game_info_changed()
+            single_max_time = exp_interval * 100
+            wait_time = client.wait_game_info_changed(interval=exp_interval, max_time=single_max_time)
+            if wait_time > single_max_time:
+                exp_interval *= 2
+            else:
+                exp_interval = 0.5
+            if exp_interval > max_exp_interval:
+                exp_interval = max_exp_interval
             room = client.get_room_info()
             user = client.get_user_info()
             gameboard = client.get_game_info()
@@ -116,6 +125,7 @@ class GameListener(object):
         self.client.login_in_guest()
         self.prefix_stategy_map = prefix_stategy_map
         self.server_url = server_url
+        self.accupied = set()
 
     def listen(self):
         while True:
@@ -125,8 +135,11 @@ class GameListener(object):
                 room_status = room[1]
                 for prefix in self.prefix_stategy_map:
                     if room_name.startswith(prefix) and room_status == GameRoom.ROOM_STATUS_ONEWAITING:
+                        if room_name in self.accupied:
+                            continue
                         print 'Evoke:', room_name
                         strg = self.prefix_stategy_map[prefix]()
+                        self.accupied.add(room_name)
                         commu = GameCommunicator(room_name, strg, self.server_url)
                         commu.start()
                         break
