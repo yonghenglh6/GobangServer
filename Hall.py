@@ -83,6 +83,18 @@ class GameRoom(object):
         }
         return last_move
 
+    def get_last_info(self):
+        (userrole, move_num, row, col) = self.board.get_lastmove()
+        if userrole < 0:
+            userrole = -1 * self.get_status() - 1
+        last_move = {
+            'role': userrole,
+            'move_num': move_num,
+            'row': row,
+            'col': col,
+        }
+        return last_move
+
     def action(self, user, action_code, action_args):
         if action_code == "put_piece":
             piece_i = action_args.get_argument('piece_i', None)
@@ -97,6 +109,8 @@ class GameRoom(object):
                 return ActionResult(-3, "Not set the piece_i and piece_j")
         elif action_code == "getlastmove":
             return ActionResult(0, self.get_last_move())
+        elif action_code == "get_last_info":
+            return ActionResult(0, self.get_last_info())
         elif action_code == "get_room_info":
             return ActionResult(0, pickle.dumps(self))
         elif action_code == "get_game_info":

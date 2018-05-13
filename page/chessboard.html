@@ -9,6 +9,7 @@
         var GLOBAL_game_status={{user.game_status}};    //game_status 用户参加状态 0未参加游戏 1正在参加游戏
         var GLOBAL_user_role={{user.game_role}};        //user_role 用户角色  0未参与游戏 1黑方 2白方
         var GLOBAL_current_role={{roominfo['room'].board.get_current_user() if roominfo['status']!=0 else -1}}; //current_role 当前行动角色 0黑方 1白方
+        var GLOBAL_chess_boardinfo=1;
     </script>
 </head>
 <body>
