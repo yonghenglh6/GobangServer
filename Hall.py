@@ -270,7 +270,8 @@ class GameRoom(object):
             os.makedirs(self.chess_folder)
         import datetime
         tm = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        chess_file = self.chess_folder + '/' + self.room_id + '_' + tm + '.txt'
+        chess_file = self.chess_folder + '/' + self.room_id + '_[' + '|'.join(
+            [user.uid for user in self.play_users]) + ']_' + tm + '.txt'
         with open(chess_file, 'w') as f:
             f.write(self.board.dumps())
 
